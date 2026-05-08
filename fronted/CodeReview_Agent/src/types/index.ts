@@ -112,3 +112,24 @@ export interface CodeReviewReport {
   securityIssues: string[];
   styleIssues: string[];
 }
+
+/* ===== Conversation (matches backend entity) ===== */
+
+export interface Conversation {
+  id: number;
+  conversationId: string;
+  userId: number;
+  title: string;
+  requirement: string;
+  status: 'ACTIVE' | 'COMPLETED' | 'FAILED';
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Page<T> {
+  records: T[];
+  total: number;
+  size: number;
+  current: number;
+  pages: number;
+}

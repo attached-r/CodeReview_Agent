@@ -1,4 +1,5 @@
-import type { FeatureType } from '../types';
+import { useState } from 'react';
+import type { FeatureType, Conversation } from '../types';
 
 interface User {
   userId: number;
@@ -15,6 +16,11 @@ interface Props {
   onNewTask: () => void;
   user: User | null;
   onLogout: () => void;
+  conversations: Conversation[];
+  selectedConvId: string | null;
+  onSelectConversation: (convId: string) => void;
+  onDeleteConversation: (convId: string) => Promise<void>;
+  onRenameConversation: (convId: string, title: string) => Promise<void>;
 }
 
 const features: { key: FeatureType; label: string; icon: string; desc: string }[] = [
@@ -22,8 +28,73 @@ const features: { key: FeatureType; label: string; icon: string; desc: string }[
   { key: 'review', label: '代码审查', icon: '🔍', desc: '静态分析、质量评分、修复建议' },
 ];
 
-export default function LeftSidebar({ active, onSwitch, taskId, status, onNewTask, user, onLogout }: Props) {
+function formatTime(dateStr: string): string {
+  const d = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now.getTime() - d.getTime();
+  const diffMin = Math.floor(diffMs / 60000);
+  if (diffMin < 1) return '刚刚';
+  if (diffMin < 60) return `${diffMin}分钟前`;
+  const diffHour = Math.floor(diffMin / 60);
+  if (diffHour < 24) return `${diffHour}小时前`;
+  const diffDay = Math.floor(diffHour / 24);
+  if (diffDay < 7) return `${diffDay}天前`;
+  return d.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' });
+}
+
+function statusLabel(status: string): string {
+  switch (status) {
+    case 'ACTIVE': return '进行中';
+    case 'COMPLETED': return '已完成';
+    case 'FAILED': return '失败';
+    default: return status;
+  }
+}
+
+function statusClass(status: string): string {
+  switch (status) {
+    case 'ACTIVE': return 'sidebar-status-running';
+    case 'COMPLETED': return 'sidebar-status-completed';
+    case 'FAILED': return 'sidebar-status-error';
+    default: return '';
+  }
+}
+
+const STATUS_COLORS: Record<string, string> = {
+  ACTIVE: 'var(--accent)',
+  COMPLETED: 'var(--success)',
+  FAILED: 'var(--error)',
+};
+
+export default function LeftSidebar({
+  active, onSwitch, taskId, status, onNewTask, user, onLogout,
+  conversations, selectedConvId, onSelectConversation, onDeleteConversation, onRenameConversation,
+}: Props) {
   const canSwitch = status !== 'running';
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState('');
+
+  const handleStartRename = (convId: string, currentTitle: string) => {
+    setEditingId(convId);
+    setEditTitle(currentTitle);
+  };
+
+  const handleSaveRename = async (convId: string) => {
+    if (editTitle.trim()) {
+      await onRenameConversation(convId, editTitle.trim());
+    }
+    setEditingId(null);
+    setEditTitle('');
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent, convId: string) => {
+    if (e.key === 'Enter') {
+      handleSaveRename(convId);
+    } else if (e.key === 'Escape') {
+      setEditingId(null);
+      setEditTitle('');
+    }
+  };
 
   return (
     <aside className="sidebar">
@@ -61,6 +132,64 @@ export default function LeftSidebar({ active, onSwitch, taskId, status, onNewTas
           </button>
         ))}
       </nav>
+
+      {/* ===== 对话历史 ===== */}
+      {conversations.length > 0 && (
+        <div className="sidebar-conversations">
+          <span className="sidebar-section-label" style={{ padding: '0 18px 8px', display: 'block' }}>
+            历史对话 ({conversations.length})
+          </span>
+          <div className="sidebar-conv-list">
+            {conversations.map((conv) => (
+              <div
+                key={conv.conversationId}
+                className={`sidebar-conv-item ${selectedConvId === conv.conversationId ? 'sidebar-conv-active' : ''}`}
+                onClick={() => onSelectConversation(conv.conversationId)}
+              >
+                <div className="sidebar-conv-info">
+                  {editingId === conv.conversationId ? (
+                    <input
+                      className="sidebar-conv-edit"
+                      value={editTitle}
+                      onChange={e => setEditTitle(e.target.value)}
+                      onBlur={() => handleSaveRename(conv.conversationId)}
+                      onKeyDown={e => handleKeyDown(e, conv.conversationId)}
+                      onClick={e => e.stopPropagation()}
+                      autoFocus
+                    />
+                  ) : (
+                    <span
+                      className="sidebar-conv-title"
+                      onDoubleClick={() => handleStartRename(conv.conversationId, conv.title)}
+                    >
+                      {conv.title}
+                    </span>
+                  )}
+                  <span className="sidebar-conv-meta">
+                    <span
+                      className="sidebar-conv-status"
+                      style={{ color: STATUS_COLORS[conv.status] || 'var(--text-muted)' }}
+                    >
+                      ●
+                    </span>
+                    <span>{formatTime(conv.createdAt)}</span>
+                  </span>
+                </div>
+                <button
+                  className="sidebar-conv-del"
+                  onClick={e => {
+                    e.stopPropagation();
+                    onDeleteConversation(conv.conversationId);
+                  }}
+                  title="删除对话"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {taskId && (
         <div className="sidebar-task">

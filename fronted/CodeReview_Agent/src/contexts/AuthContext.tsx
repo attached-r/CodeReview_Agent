@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
-import { login as apiLogin, register as apiRegister } from '../api/auth';
+import { login as apiLogin, register as apiRegister, logout as apiLogout, getMe } from '../api/auth';
 import type { LoginData, RegisterParams } from '../api/auth';
 
 export interface User {
@@ -14,7 +14,7 @@ interface AuthContextType {
   loading: boolean;
   login: (username: string, password: string) => Promise<void>;
   register: (params: RegisterParams) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -24,17 +24,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const stored = localStorage.getItem('auth_user');
-    const token = localStorage.getItem('auth_token');
-    if (stored && token) {
-      try {
-        setUser(JSON.parse(stored));
-      } catch {
-        localStorage.removeItem('auth_user');
-        localStorage.removeItem('auth_token');
+    const initAuth = async () => {
+      const token = localStorage.getItem('auth_token');
+      if (!token) {
+        setLoading(false);
+        return;
       }
-    }
-    setLoading(false);
+      try {
+        const res = await getMe();
+        if (res.code === 200 && res.data) {
+          const userData: User = {
+            userId: res.data.userId,
+            username: res.data.username,
+            nickname: res.data.nickname,
+            role: res.data.role,
+          };
+          localStorage.setItem('auth_user', JSON.stringify(userData));
+          setUser(userData);
+        } else {
+          localStorage.removeItem('auth_token');
+          localStorage.removeItem('auth_user');
+        }
+      } catch {
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('auth_user');
+      } finally {
+        setLoading(false);
+      }
+    };
+    initAuth();
 
     const onUnauthorized = () => {
       localStorage.removeItem('auth_token');
@@ -63,7 +81,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const logout = () => {
+  const logout = async () => {
+    try {
+      await apiLogout();
+    } catch {
+      // 即使 API 调用失败，也清理本地状态
+    }
     localStorage.removeItem('auth_token');
     localStorage.removeItem('auth_user');
     setUser(null);

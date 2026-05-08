@@ -40,3 +40,27 @@ export async function register(params: RegisterParams): Promise<ApiResult<unknow
   });
   return res.json();
 }
+
+function getAuthHeaders(): Record<string, string> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  const token = localStorage.getItem('auth_token');
+  if (token) {
+    headers['rj-token'] = token;
+  }
+  return headers;
+}
+
+export async function logout(): Promise<ApiResult<unknown>> {
+  const res = await fetch('/api/auth/logout', {
+    method: 'POST',
+    headers: getAuthHeaders(),
+  });
+  return res.json();
+}
+
+export async function getMe(): Promise<ApiResult<LoginData>> {
+  const res = await fetch('/api/auth/me', {
+    headers: getAuthHeaders(),
+  });
+  return res.json();
+}

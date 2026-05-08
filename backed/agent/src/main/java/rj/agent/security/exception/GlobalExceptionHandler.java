@@ -46,4 +46,13 @@ public class GlobalExceptionHandler {
         log.warn("业务异常: {}", e.getMessage());
         return Result.error(400, e.getMessage());
     }
+
+    /**
+     * 输入过滤安全异常（Prompt 注入/指令篡改）
+     */
+    @ExceptionHandler(SecurityException.class)
+    public Result<?> handleSecurity(SecurityException e) {
+        log.warn("输入过滤拦截: {}", e.getMessage());
+        return Result.error(400, e.getMessage());
+    }
 }

@@ -11,16 +11,12 @@ import java.time.OffsetDateTime;
  * 对话/任务实体类
  * 对应数据库表: conversations
  * 用于存储用户与 Agent 之间的对话会话信息
- *
- * @author agent
  */
 @Data
 @TableName("conversations")
 public class Conversation {
 
-    /**
-     * 主键 ID（自增）
-     */
+    /** 主键 ID（自增） */
     @TableId(type = IdType.AUTO)
     private Long id;
 

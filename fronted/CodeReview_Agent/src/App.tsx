@@ -1,10 +1,15 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import type {
   AgentNode, AgentStep, PlannerOutput, CoderOutput, ReviewOutput, TaskStatus,
-  FeatureType, StreamMessage, CodeReviewReport,
+  FeatureType, StreamMessage, CodeReviewReport, Conversation,
 } from './types';
 import { submitCodeTask } from './api/codeTask';
 import { useAuth } from './contexts/AuthContext';
+import {
+  listConversations,
+  deleteConversation as apiDeleteConversation,
+  updateConversationTitle as apiUpdateTitle,
+} from './api/conversations';
 import LeftSidebar from './components/LeftSidebar';
 import RequirementInput from './components/RequirementInput';
 import AgentFlow from './components/AgentFlow';
@@ -31,6 +36,25 @@ function nextMsgId(): string {
 export default function App() {
   const { user, logout } = useAuth();
   const [feature, setFeature] = useState<FeatureType>('generate');
+
+  /* ---- Conversation list ---- */
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [selectedConvId, setSelectedConvId] = useState<string | null>(null);
+
+  const fetchConversations = useCallback(async () => {
+    try {
+      const res = await listConversations(1, 50);
+      if (res.code === 200 && res.data) {
+        setConversations(res.data.records);
+      }
+    } catch {
+      // 静默处理
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchConversations();
+  }, [fetchConversations]);
 
   /* ---- Generate state ---- */
   const [genStatus, setGenStatus] = useState<TaskStatus>('idle');
@@ -103,10 +127,13 @@ export default function App() {
       onPhase: (data) => {
         if (data.phase === 'start') {
           const match = data.content.match(/\[(.+?)\]/);
-          if (match) setTaskId(match[1]);
+          if (match) {
+            const convId = match[1];
+            setTaskId(convId);
+            setSelectedConvId(convId);
+          }
           addGenMsg('system', 'System', data.content, 'info');
         } else if (data.phase.endsWith('_stream')) {
-          // 流式内容 chunk，按阶段累积
           const basePhase = data.phase.replace('_stream', '');
           setStreamingContent(prev => ({
             ...prev,
@@ -127,6 +154,8 @@ export default function App() {
         }
         addGenMsg('system', 'System', '任务执行完成', 'success');
         setGenStatus('completed');
+        // 完成后刷新对话列表
+        setTimeout(() => fetchConversations(), 500);
       },
       onError: (data) => {
         setErrorMessage(data.content);
@@ -136,7 +165,7 @@ export default function App() {
     });
 
     abortRef.current = abort;
-  }, [addStep, addGenMsg]);
+  }, [addStep, addGenMsg, fetchConversations]);
 
   const handleNewTask = useCallback(() => {
     if (abortRef.current) abortRef.current.abort();
@@ -148,6 +177,7 @@ export default function App() {
     setCodeResult(null);
     setReviewResult(null);
     setErrorMessage(null);
+    setSelectedConvId(null);
     setReviewStatus('idle');
     setReviewMessages([]);
     setReviewReport(null);
@@ -158,6 +188,46 @@ export default function App() {
     if (genStatus === 'running') return;
     setFeature(f);
   }, [genStatus]);
+
+  /* ---- Conversation handlers ---- */
+  const handleSelectConversation = useCallback((convId: string) => {
+    if (genStatus === 'running') return;
+    setSelectedConvId(convId);
+    setGenStatus('idle');
+    setTaskId(null);
+    setSteps([]);
+    setGenMessages([]);
+    setPlanResult(null);
+    setCodeResult(null);
+    setReviewResult(null);
+    setErrorMessage(null);
+    setStreamingContent({});
+  }, [genStatus]);
+
+  const handleDeleteConversation = useCallback(async (convId: string) => {
+    try {
+      const res = await apiDeleteConversation(convId);
+      if (res.code === 200) {
+        setConversations(prev => prev.filter(c => c.conversationId !== convId));
+        if (selectedConvId === convId) setSelectedConvId(null);
+      }
+    } catch {
+      // 静默处理
+    }
+  }, [selectedConvId]);
+
+  const handleRenameConversation = useCallback(async (convId: string, title: string) => {
+    try {
+      const res = await apiUpdateTitle(convId, title);
+      if (res.code === 200 && res.data) {
+        setConversations(prev =>
+          prev.map(c => c.conversationId === convId ? { ...c, title: res.data!.title } : c),
+        );
+      }
+    } catch {
+      // 静默处理
+    }
+  }, []);
 
   /* ---- Review callbacks ---- */
   const onReviewStart = useCallback(() => {
@@ -191,6 +261,11 @@ export default function App() {
         onNewTask={handleNewTask}
         user={user}
         onLogout={logout}
+        conversations={conversations}
+        selectedConvId={selectedConvId}
+        onSelectConversation={handleSelectConversation}
+        onDeleteConversation={handleDeleteConversation}
+        onRenameConversation={handleRenameConversation}
       />
 
       <main className="center-panel">
@@ -199,7 +274,11 @@ export default function App() {
           <>
             <div className="center-scroll">
               <div className="center-section">
-                <RequirementInput onSubmit={handleGenSubmit} disabled={genRunning} />
+                <RequirementInput
+                  onSubmit={handleGenSubmit}
+                  disabled={genRunning}
+                  key={selectedConvId ?? 'new'}
+                />
               </div>
 
               {(genStatus !== 'idle') && (

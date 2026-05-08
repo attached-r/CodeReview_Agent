@@ -1,10 +1,9 @@
 package rj.agent.security.controller;
 
+import cn.dev33.satoken.stp.StpUtil;
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
+import rj.agent.entity.User;
 import rj.agent.security.model.LoginRequest;
 import rj.agent.security.model.RegisterRequest;
 import rj.agent.security.model.Result;
@@ -17,6 +16,7 @@ import java.util.Map;
  * <p>
  * 提供用户注册和登录两个公开接口（无需 token），
  * 已通过 SaTokenConfig 中的拦截器配置放行 /api/auth/**。
+ * 退出和获取当前用户信息需要登录后调用。
  */
 @RestController
 @RequestMapping("/api/auth")
@@ -33,7 +33,6 @@ public class AuthController {
      */
     @PostMapping("/register")
     public Result<?> register(@RequestBody RegisterRequest req) {
-        // 简单参数校验
         if (req.getUsername() == null || req.getUsername().isBlank()) {
             return Result.error(400, "用户名不能为空");
         }
@@ -62,5 +61,27 @@ public class AuthController {
 
         Map<String, Object> data = authService.login(req);
         return Result.ok(data);
+    }
+
+    /**
+     * 退出登录
+     * <p>
+     * 清除当前用户的 Redis 中的 token 会话，下次请求需重新登录。
+     */
+    @PostMapping("/logout")
+    public Result<?> logout() {
+        StpUtil.logout();
+        return Result.ok();
+    }
+
+    /**
+     * 获取当前登录用户信息
+     * <p>
+     * 根据当前 token 解析出用户 ID，从数据库查询完整信息返回。
+     */
+    @GetMapping("/me")
+    public Result<User> me() {
+        User user = authService.getCurrentUser();
+        return Result.ok(user);
     }
 }
