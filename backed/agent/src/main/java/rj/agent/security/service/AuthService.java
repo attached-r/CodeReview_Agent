@@ -26,4 +26,13 @@ public interface AuthService {
      * @return token 相关数据 + 用户基本信息
      */
     Map<String, Object> login(LoginRequest req);
+
+    /**
+     * 获取当前登录用户
+     * <p>
+     * 从 Sa-Token 上下文解析 userId，查询数据库返回完整用户信息。
+     *
+     * @return 当前登录用户实体
+     */
+    User getCurrentUser();
 }

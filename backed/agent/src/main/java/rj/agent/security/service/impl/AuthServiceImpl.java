@@ -84,4 +84,14 @@ public class AuthServiceImpl implements AuthService {
         data.put("role", user.getRole());
         return data;
     }
+
+    @Override
+    public User getCurrentUser() {
+        long userId = StpUtil.getLoginIdAsLong();
+        User user = userMapper.selectById(userId);
+        if (user == null) {
+            throw new RuntimeException("用户不存在");
+        }
+        return user;
+    }
 }
