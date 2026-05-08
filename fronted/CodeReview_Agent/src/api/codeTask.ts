@@ -11,6 +11,21 @@ export type SSECallback = {
   onError?: (data: SSEErrorEvent) => void;
 };
 
+function getAuthHeaders(): Record<string, string> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  const token = localStorage.getItem('auth_token');
+  if (token) {
+    headers['rj-token'] = token;
+  }
+  return headers;
+}
+
+function handleUnauthorized() {
+  localStorage.removeItem('auth_token');
+  localStorage.removeItem('auth_user');
+  window.dispatchEvent(new CustomEvent('auth:unauthorized'));
+}
+
 /**
  * 提交代码生成任务，通过 fetch + ReadableStream 接收 SSE 流式推送
  * 后端以 Flux<ServerSentEvent<StreamEvent>> 输出，event 类型为 phase / result / error
@@ -23,11 +38,16 @@ export function submitCodeTask(
 
   fetch('/api/code-task/generate', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getAuthHeaders(),
     body: JSON.stringify({ requirement }),
     signal: controller.signal,
   })
     .then(async (response) => {
+      if (response.status === 401) {
+        handleUnauthorized();
+        callbacks.onError?.({ type: 'error', phase: 'end', content: '登录已过期，请重新登录' });
+        return;
+      }
       if (!response.ok) {
         callbacks.onError?.({ type: 'error', phase: 'end', content: `请求失败: ${response.status}` });
         return;
