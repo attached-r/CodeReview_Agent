@@ -1,6 +1,12 @@
 spring:
   application:
     name: agent
+  # 配置postgresql数据库连接
+  datasource:
+    url: jdbc:postgresql://localhost:5432/postgres
+    username: postgres
+    password: ${POSTGRESQL_PASSWORD:123456789rj}
+    driver-class-name: org.postgresql.Driver
 
   ai:
     ollama:
@@ -14,6 +20,19 @@ spring:
       embedding:
         options:
           model: nomic-embed-text:latest
+      init:
+        timeout: 300s
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true # 开启驼峰命名
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  global-config:
+    db-config:
+      id-type: auto
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
 
 server:
   port: 8099

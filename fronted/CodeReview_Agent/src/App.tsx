@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import type {
   AgentNode, AgentStep, PlannerOutput, CoderOutput, ReviewOutput, TaskStatus,
   FeatureType, StreamMessage, CodeReviewReport,
@@ -12,15 +12,14 @@ import CodeReview from './components/CodeReview';
 import PlanResult from './components/PlanResult';
 import CodeResult from './components/CodeResult';
 import ReviewResult from './components/ReviewResult';
+import MarkdownRenderer from './components/MarkdownRenderer';
 import './App.css';
 
-function toAgentNode(node: string): AgentNode {
-  const lower = node.toLowerCase();
-  if (lower.includes('planner')) return 'planner';
-  if (lower.includes('coder')) return 'coder';
-  if (lower.includes('reviewer') || lower.includes('review')) return 'reviewer';
-  if (lower.includes('accepted') || lower.includes('failed') || lower.includes('end')) return 'end';
-  return 'planner';
+function phaseToNode(phase: string): AgentNode {
+  if (phase === 'planner') return 'planner';
+  if (phase === 'coder') return 'coder';
+  if (phase === 'reviewer') return 'reviewer';
+  return 'end';
 }
 
 let msgCounter = 0;
@@ -40,7 +39,38 @@ export default function App() {
   const [codeResult, setCodeResult] = useState<CoderOutput | null>(null);
   const [reviewResult, setReviewResult] = useState<ReviewOutput | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [streamingContent, setStreamingContent] = useState<Record<string, string>>({});
   const abortRef = useRef<AbortController | null>(null);
+
+  /* ---- Right panel resize ---- */
+  const [rightWidth, setRightWidth] = useState(420);
+  const dragRef = useRef(false);
+
+  useEffect(() => {
+    const onMouseMove = (e: MouseEvent) => {
+      if (!dragRef.current) return;
+      const newWidth = window.innerWidth - e.clientX;
+      setRightWidth(Math.max(300, Math.min(900, newWidth)));
+    };
+    const onMouseUp = () => {
+      if (!dragRef.current) return;
+      dragRef.current = false;
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+    return () => {
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+    };
+  }, []);
+
+  const onResizeStart = useCallback(() => {
+    dragRef.current = true;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  }, []);
 
   /* ---- Review state ---- */
   const [reviewStatus, setReviewStatus] = useState<'idle' | 'running' | 'completed'>('idle');
@@ -65,29 +95,40 @@ export default function App() {
     setCodeResult(null);
     setReviewResult(null);
     setErrorMessage(null);
+    setStreamingContent({});
 
     const abort = submitCodeTask(requirement, {
-      onStart: (data) => {
-        setTaskId(data.taskId);
-        addStep('planner', data.message);
-        addGenMsg('system', 'System', `任务已创建: ${data.taskId}`, 'info');
-        addGenMsg('planner', 'Planner', data.message, 'step');
+      onPhase: (data) => {
+        if (data.phase === 'start') {
+          const match = data.content.match(/\[(.+?)\]/);
+          if (match) setTaskId(match[1]);
+          addGenMsg('system', 'System', data.content, 'info');
+        } else if (data.phase.endsWith('_stream')) {
+          // 流式内容 chunk，按阶段累积
+          const basePhase = data.phase.replace('_stream', '');
+          setStreamingContent(prev => ({
+            ...prev,
+            [basePhase]: (prev[basePhase] || '') + data.content,
+          }));
+        } else {
+          const node = phaseToNode(data.phase);
+          addStep(node, data.content);
+          const label = node.charAt(0).toUpperCase() + node.slice(1);
+          addGenMsg(node, label, data.content, 'step');
+        }
       },
-      onAgentEvent: (data) => {
-        const node = toAgentNode(data.node);
-        addStep(node, data.message);
-        addGenMsg(node, data.node, data.message, 'step');
-      },
-      onCompleted: (data) => {
-        if (data.plan) setPlanResult(data.plan);
-        if (data.code) setCodeResult(data.code);
-        if (data.review) setReviewResult(data.review);
+      onResult: (data) => {
+        if (data.data) {
+          if (data.data.plan) setPlanResult(data.data.plan);
+          if (data.data.code) setCodeResult(data.data.code);
+          if (data.data.review) setReviewResult(data.data.review);
+        }
         addGenMsg('system', 'System', '任务执行完成', 'success');
         setGenStatus('completed');
       },
       onError: (data) => {
-        setErrorMessage(data.message);
-        addGenMsg('system', 'System', `错误: ${data.message}`, 'error');
+        setErrorMessage(data.content);
+        addGenMsg('system', 'System', `错误: ${data.content}`, 'error');
         setGenStatus('error');
       },
     });
@@ -108,6 +149,7 @@ export default function App() {
     setReviewStatus('idle');
     setReviewMessages([]);
     setReviewReport(null);
+    setStreamingContent({});
   }, []);
 
   const handleFeatureSwitch = useCallback((f: FeatureType) => {
@@ -134,7 +176,7 @@ export default function App() {
   const genRunning = genStatus === 'running';
   const reviewRunning = reviewStatus === 'running';
   const showRightPanel = feature === 'generate'
-    ? (planResult || codeResult || reviewResult || errorMessage)
+    ? (streamingContent.planner || streamingContent.coder || streamingContent.reviewer || planResult || codeResult || reviewResult || errorMessage)
     : (reviewReport !== null);
 
   return (
@@ -184,8 +226,13 @@ export default function App() {
         )}
       </main>
 
-      <aside className="right-panel">
-        {/* ===== 生成结果 ===== */}
+      <div
+        className="resize-handle"
+        onMouseDown={onResizeStart}
+      />
+
+      <aside className="right-panel" style={{ width: rightWidth, minWidth: rightWidth }}>
+        {/* ===== 生成结果（流式 + 最终结构数据） ===== */}
         {feature === 'generate' && (
           <div className="right-scroll">
             {errorMessage && (
@@ -195,19 +242,48 @@ export default function App() {
               </div>
             )}
 
-            {planResult && (
+            {/* Planner 流式内容 */}
+            {(streamingContent.planner || planResult) && (
               <div className="right-section">
-                <PlanResult plan={planResult} />
+                <div className="result-section">
+                  <h3 className="section-title">📋 任务规划</h3>
+                  {streamingContent.planner && (
+                    <div className="result-card">
+                      <MarkdownRenderer content={streamingContent.planner} />
+                    </div>
+                  )}
+                  {planResult && <PlanResult plan={planResult} />}
+                </div>
               </div>
             )}
-            {codeResult && (
+
+            {/* Coder 流式内容 */}
+            {(streamingContent.coder || codeResult) && (
               <div className="right-section">
-                <CodeResult code={codeResult} />
+                <div className="result-section">
+                  <h3 className="section-title">💻 生成代码</h3>
+                  {streamingContent.coder && (
+                    <div className="result-card">
+                      <MarkdownRenderer content={streamingContent.coder} />
+                    </div>
+                  )}
+                  {codeResult && <CodeResult code={codeResult} />}
+                </div>
               </div>
             )}
-            {reviewResult && (
+
+            {/* Reviewer 流式内容 */}
+            {(streamingContent.reviewer || reviewResult) && (
               <div className="right-section">
-                <ReviewResult review={reviewResult} />
+                <div className="result-section">
+                  <h3 className="section-title">🔍 代码审查</h3>
+                  {streamingContent.reviewer && (
+                    <div className="result-card">
+                      <MarkdownRenderer content={streamingContent.reviewer} />
+                    </div>
+                  )}
+                  {reviewResult && <ReviewResult review={reviewResult} />}
+                </div>
               </div>
             )}
 

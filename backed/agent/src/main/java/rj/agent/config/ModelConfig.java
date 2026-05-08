@@ -1,26 +1,42 @@
 package rj.agent.config;
+
+import io.netty.channel.ChannelOption;
+import reactor.netty.http.client.HttpClient;
+
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.ollama.OllamaChatModel;
 import org.springframework.ai.ollama.api.OllamaApi;
 import org.springframework.ai.ollama.api.OllamaChatOptions;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
+import org.springframework.http.client.ReactorClientHttpRequestFactory;
+import org.springframework.web.client.RestClient;
 
-// ... existing code ...
+import java.time.Duration;
 
 /**
  * 模型配置
- * 对三个agent进行模型配置 自动读取配置文件
- * 后续可以添加其他模型配置
+ * 对三个agent进行模型配置
  */
 @Configuration
 public class ModelConfig {
-
+    //自定义 ollama api 传入Rest Client 增加超时设置
     @Bean
-    public OllamaApi ollamaApi() {
-        return new OllamaApi.Builder().build();
+    public OllamaApi ollamaApi(@Value("${spring.ai.ollama.base-url:http://localhost:11434}") String baseUrl) {
+        HttpClient httpClient = HttpClient.create()
+                .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 30000)  // 设置超时时间为30秒
+            .responseTimeout(Duration.ofMinutes(10));  // 设置响应超时为10分钟
+
+        ReactorClientHttpRequestFactory requestFactory = new ReactorClientHttpRequestFactory(httpClient);
+
+        return OllamaApi.builder()
+                .baseUrl(baseUrl)
+                .restClientBuilder(RestClient.builder().requestFactory(requestFactory))
+                .build();
     }
+
 
     @Primary
     @Bean("plannerChatModel")
