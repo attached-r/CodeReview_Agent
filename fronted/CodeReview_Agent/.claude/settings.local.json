@@ -3,7 +3,12 @@
     "allow": [
       "Bash(npx tsc *)",
       "Bash(npx vite *)",
-      "Bash(cmd.exe *)"
+      "Bash(cmd.exe *)",
+      "Bash(npm install *)",
+      "Read(//d/ProjectBySelf/CodeReview_Agent/backed/agent/**)",
+      "Bash(mvn compile *)",
+      "Bash(npm --version)",
+      "Bash(npm.cmd install *)"
     ]
   }
 }

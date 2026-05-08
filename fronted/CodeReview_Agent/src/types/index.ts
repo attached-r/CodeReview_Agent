@@ -36,32 +36,33 @@ export interface ReviewOutput {
   summary: string;
 }
 
-/* ===== SSE Event Types ===== */
+/* ===== SSE Event Types (匹配后端 StreamEvent 模型) ===== */
 
-export type SSEEventName = 'START' | 'AGENT_EVENT' | 'COMPLETED' | 'ERROR';
+export type SSEEventName = 'phase' | 'result' | 'error';
 
-export interface SSEStartEvent {
-  taskId: string;
-  node: string;
-  message: string;
-  requirement: string;
+export interface SSEPhaseEvent {
+  type: 'phase';
+  phase: string;
+  content: string;
 }
 
-export interface SSEAgentEvent {
-  node: string;
-  target: string;
-  message: string;
-}
-
-export interface SSECompletedEvent {
-  accepted: boolean;
-  plan: PlannerOutput | null;
-  code: CoderOutput | null;
-  review: ReviewOutput | null;
+export interface SSEResultEvent {
+  type: 'result';
+  phase: string;
+  content: string;
+  data: {
+    accepted: boolean;
+    plan: PlannerOutput | null;
+    code: CoderOutput | null;
+    review: ReviewOutput | null;
+    retryCount: number;
+  } | null;
 }
 
 export interface SSEErrorEvent {
-  message: string;
+  type: 'error';
+  phase: string;
+  content: string;
 }
 
 export type AgentNode = 'planner' | 'coder' | 'reviewer' | 'end';

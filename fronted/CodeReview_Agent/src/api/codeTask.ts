@@ -1,21 +1,19 @@
 import type {
-  SSEStartEvent,
-  SSEAgentEvent,
-  SSECompletedEvent,
+  SSEPhaseEvent,
+  SSEResultEvent,
   SSEErrorEvent,
   SSEEventName,
 } from '../types';
 
 export type SSECallback = {
-  onStart?: (data: SSEStartEvent) => void;
-  onAgentEvent?: (data: SSEAgentEvent) => void;
-  onCompleted?: (data: SSECompletedEvent) => void;
+  onPhase?: (data: SSEPhaseEvent) => void;
+  onResult?: (data: SSEResultEvent) => void;
   onError?: (data: SSEErrorEvent) => void;
 };
 
 /**
- * 提交代码生成任务，通过 EventSource 接收 SSE 流式推送
- * 返回 AbortController 用于取消请求
+ * 提交代码生成任务，通过 fetch + ReadableStream 接收 SSE 流式推送
+ * 后端以 Flux<ServerSentEvent<StreamEvent>> 输出，event 类型为 phase / result / error
  */
 export function submitCodeTask(
   requirement: string,
@@ -31,13 +29,13 @@ export function submitCodeTask(
   })
     .then(async (response) => {
       if (!response.ok) {
-        callbacks.onError?.({ message: `请求失败: ${response.status}` });
+        callbacks.onError?.({ type: 'error', phase: 'end', content: `请求失败: ${response.status}` });
         return;
       }
 
       const reader = response.body?.getReader();
       if (!reader) {
-        callbacks.onError?.({ message: '响应流不可用' });
+        callbacks.onError?.({ type: 'error', phase: 'end', content: '响应流不可用' });
         return;
       }
 
@@ -65,7 +63,7 @@ export function submitCodeTask(
     })
     .catch((err) => {
       if (err.name !== 'AbortError') {
-        callbacks.onError?.({ message: `连接异常: ${err.message}` });
+        callbacks.onError?.({ type: 'error', phase: 'end', content: `连接异常: ${err.message}` });
       }
     });
 
@@ -99,16 +97,13 @@ function dispatchEvent(
     const data = JSON.parse(rawData);
 
     switch (eventName) {
-      case 'START':
-        callbacks.onStart?.(data as SSEStartEvent);
+      case 'phase':
+        callbacks.onPhase?.(data as SSEPhaseEvent);
         break;
-      case 'AGENT_EVENT':
-        callbacks.onAgentEvent?.(data as SSEAgentEvent);
+      case 'result':
+        callbacks.onResult?.(data as SSEResultEvent);
         break;
-      case 'COMPLETED':
-        callbacks.onCompleted?.(data as SSECompletedEvent);
-        break;
-      case 'ERROR':
+      case 'error':
         callbacks.onError?.(data as SSEErrorEvent);
         break;
     }
