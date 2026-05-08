@@ -4,6 +4,7 @@ import type {
   FeatureType, StreamMessage, CodeReviewReport,
 } from './types';
 import { submitCodeTask } from './api/codeTask';
+import { useAuth } from './contexts/AuthContext';
 import LeftSidebar from './components/LeftSidebar';
 import RequirementInput from './components/RequirementInput';
 import AgentFlow from './components/AgentFlow';
@@ -28,6 +29,7 @@ function nextMsgId(): string {
 }
 
 export default function App() {
+  const { user, logout } = useAuth();
   const [feature, setFeature] = useState<FeatureType>('generate');
 
   /* ---- Generate state ---- */
@@ -187,6 +189,8 @@ export default function App() {
         taskId={taskId}
         status={genStatus}
         onNewTask={handleNewTask}
+        user={user}
+        onLogout={logout}
       />
 
       <main className="center-panel">

@@ -34,6 +34,21 @@ mybatis-plus:
       logic-delete-value: 1
       logic-not-delete-value: 0
 
+# Redis 连接配置（sa-token token 默认存储在此）
+spring.data.redis:
+  host: localhost
+  port: 6379
+  timeout: 5000ms
+  database: 6
+  password: ${REDIS_PASSWORD:20050603RJ}
+
+# 配置sa-token
+sa-token:
+  token-name: rj-token
+  timeout: 86400 # token有效期 24h
+  is-concurrent: true # 是否允许同一账号多设备登录
+  token-style: uuid
+  is-log: true
 server:
   port: 8099
 

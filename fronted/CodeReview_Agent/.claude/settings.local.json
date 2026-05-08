@@ -8,7 +8,11 @@
       "Read(//d/ProjectBySelf/CodeReview_Agent/backed/agent/**)",
       "Bash(mvn compile *)",
       "Bash(npm --version)",
-      "Bash(npm.cmd install *)"
+      "Bash(npm.cmd install *)",
+      "Read(//d//**)",
+      "Bash(ls -la \"D:/ProjectBySelf/CodeReview_Agent/backed\")",
+      "Bash(ls -la \"/d/ProjectBySelf/CodeReview_Agent/backed\")",
+      "Bash(ls -la \"/cygdrive/d/ProjectBySelf/CodeReview_Agent/backed\")"
     ]
   }
 }

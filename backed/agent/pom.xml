@@ -115,6 +115,19 @@
             <version>${mybatis-plus.version}</version>
         </dependency>
 
+        <!-- so-token 做登录校验-->
+        <dependency>
+            <groupId>cn.dev33</groupId>
+            <artifactId>sa-token-spring-boot3-starter</artifactId>
+            <version>1.45.0</version>
+        </dependency>
+
+        <!-- sa-token 集成 Redis（Jackson 序列化，存储 token 会话到 Redis） -->
+        <dependency>
+            <groupId>cn.dev33</groupId>
+            <artifactId>sa-token-redis-jackson</artifactId>
+            <version>1.45.0</version>
+        </dependency>
     </dependencies>
 
     <build>
