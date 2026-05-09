@@ -1,6 +1,9 @@
 package rj.agent.service.impl;
 
+import com.alibaba.cloud.ai.graph.exception.GraphStateException;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.ai.chat.memory.ChatMemory;
+import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import rj.agent.agent.CoderAgent;
@@ -13,6 +16,7 @@ import rj.agent.model.StreamEvent;
 import rj.agent.service.CodeTaskService;
 
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -30,18 +34,21 @@ public class CodeTaskServiceImpl implements CodeTaskService {
     private final CoderAgent coderAgent;
     private final ReviewerAgent reviewerAgent;
     private final ConversationMapper conversationMapper;
+    private final ChatMemory chatMemory;
 
     public CodeTaskServiceImpl(PlannerAgent plannerAgent, CoderAgent coderAgent,
                                ReviewerAgent reviewerAgent,
-                               ConversationMapper conversationMapper) {
+                               ConversationMapper conversationMapper,
+                               ChatMemory chatMemory) {
         this.plannerAgent = plannerAgent;
         this.coderAgent = coderAgent;
         this.reviewerAgent = reviewerAgent;
         this.conversationMapper = conversationMapper;
+        this.chatMemory = chatMemory;
     }
 
     @Override
-    public Flux<StreamEvent> executeTask(String requirement, Long userId) {
+    public Flux<StreamEvent> executeTask(String requirement, Long userId) throws GraphStateException {
         String taskId = UUID.randomUUID().toString().substring(0, 8);
         log.info("[Task-{}] 用户[{}]开始新任务: {}", taskId, userId, truncate(requirement, 100));
 
@@ -56,13 +63,18 @@ public class CodeTaskServiceImpl implements CodeTaskService {
         conversation.setUpdatedAt(OffsetDateTime.now());
         conversationMapper.insert(conversation);
 
+        // 持久化用户消息
+        chatMemory.add(conversation.getConversationId(), List.of(
+                new UserMessage(requirement)
+        ));
+
         CodeGenerationGraph graph = new CodeGenerationGraph(
-                plannerAgent, coderAgent, reviewerAgent);
+                plannerAgent, coderAgent, reviewerAgent, chatMemory);
 
         return Flux.concat(
                 Flux.just(StreamEvent.phase("start",
                         String.format("任务[%s]开始执行", taskId))),
-                graph.execute(requirement)
+                graph.execute(requirement, conversation.getConversationId(), userId)
         ).doOnNext(event -> {
             if ("error".equals(event.getType())) {
                 log.error("[Task-{}] 用户[{}]任务异常: {}", taskId, userId, event.getContent());

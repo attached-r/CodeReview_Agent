@@ -12,7 +12,10 @@
       "Read(//d//**)",
       "Bash(ls -la \"D:/ProjectBySelf/CodeReview_Agent/backed\")",
       "Bash(ls -la \"/d/ProjectBySelf/CodeReview_Agent/backed\")",
-      "Bash(ls -la \"/cygdrive/d/ProjectBySelf/CodeReview_Agent/backed\")"
+      "Bash(ls -la \"/cygdrive/d/ProjectBySelf/CodeReview_Agent/backed\")",
+      "Bash(git *)",
+      "Bash(npm run *)",
+      "Bash(echo \"EXIT: $?\")"
     ]
   }
 }

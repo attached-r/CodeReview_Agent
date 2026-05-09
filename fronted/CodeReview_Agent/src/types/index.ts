@@ -113,6 +113,22 @@ export interface CodeReviewReport {
   styleIssues: string[];
 }
 
+/* ===== ConversationMessage (matches backend entity) ===== */
+
+export interface ConversationMessage {
+  id: number;
+  conversationId: string;
+  messageId: string;
+  role: string;
+  content: string;
+  tokenCount: number | null;
+  modelName: string | null;
+  metadata: Record<string, unknown> | null;
+  messageIndex: number | null;
+  parentMessageId: string | null;
+  createdAt: string;
+}
+
 /* ===== Conversation (matches backend entity) ===== */
 
 export interface Conversation {

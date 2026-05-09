@@ -16,6 +16,18 @@ export interface LoginData {
   role: string;
 }
 
+/** 匹配后端 User 实体 — /api/auth/me 返回此结构 */
+export interface UserProfile {
+  id: number;
+  username: string;
+  email: string | null;
+  nickname: string;
+  role: string;
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export async function login(username: string, password: string): Promise<ApiResult<LoginData>> {
   const res = await fetch('/api/auth/login', {
     method: 'POST',
@@ -58,7 +70,7 @@ export async function logout(): Promise<ApiResult<unknown>> {
   return res.json();
 }
 
-export async function getMe(): Promise<ApiResult<LoginData>> {
+export async function getMe(): Promise<ApiResult<UserProfile>> {
   const res = await fetch('/api/auth/me', {
     headers: getAuthHeaders(),
   });

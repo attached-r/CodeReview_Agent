@@ -1,0 +1,1 @@
+bash: whoami: command not found

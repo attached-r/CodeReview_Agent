@@ -86,6 +86,7 @@ public class CoderAgent {
             """;
     // 用户提示词
     private static final String USER_PROMPT_TEMPLATE = """
+            {historyContext}
             请根据以下任务计划生成代码：
 
             需求描述：
@@ -115,7 +116,7 @@ public class CoderAgent {
      * @param previousReview
      * @return
      */
-    public CoderOutput execute(String requirement, PlannerOutput plan, ReviewOutput previousReview) {
+    public CoderOutput execute(String requirement, PlannerOutput plan, ReviewOutput previousReview, String historyContext) {
         String format = outputConverter.getFormat();
 
         String reviewContext = buildReviewContext(previousReview);
@@ -123,7 +124,8 @@ public class CoderAgent {
         String userContent = USER_PROMPT_TEMPLATE
                 .replace("{requirement}", requirement)
                 .replace("{plan}", planJson)
-                .replace("{reviewContext}", reviewContext);
+                .replace("{reviewContext}", reviewContext)
+                .replace("{historyContext}", historyContext != null ? historyContext : "");
 
         Prompt prompt = new Prompt(List.of(
                 new SystemMessage(SYSTEM_PROMPT.replace("{format}", format)),
