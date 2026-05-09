@@ -76,6 +76,7 @@ public class PlannerAgent {
             """;
 
     private static final String USER_PROMPT = """
+            {historyContext}
             请为以下需求制定代码实现计划：
 
             需求描述：
@@ -90,9 +91,11 @@ public class PlannerAgent {
         this.outputConverter = new BeanOutputConverter<>(PlannerOutput.class);
     }
 
-    public PlannerOutput execute(String requirement) {
+    public PlannerOutput execute(String requirement, String historyContext) {
         String format = outputConverter.getFormat();
-        String userContent = USER_PROMPT.replace("{requirement}", requirement);
+        String userContent = USER_PROMPT
+                .replace("{historyContext}", historyContext != null ? historyContext : "")
+                .replace("{requirement}", requirement);
 
         Prompt prompt = new Prompt(List.of(
                 new SystemMessage(SYSTEM_PROMPT.replace("{format}", format)),

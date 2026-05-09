@@ -34,7 +34,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const res = await getMe();
         if (res.code === 200 && res.data) {
           const userData: User = {
-            userId: res.data.userId,
+            userId: res.data.id,
             username: res.data.username,
             nickname: res.data.nickname,
             role: res.data.role,

@@ -1,9 +1,10 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import type {
   AgentNode, AgentStep, PlannerOutput, CoderOutput, ReviewOutput, TaskStatus,
-  FeatureType, StreamMessage, CodeReviewReport, Conversation,
+  FeatureType, StreamMessage, CodeReviewReport, Conversation, ConversationMessage,
 } from './types';
 import { submitCodeTask } from './api/codeTask';
+import { listAllMessages } from './api/messages';
 import { useAuth } from './contexts/AuthContext';
 import {
   listConversations,
@@ -19,6 +20,7 @@ import PlanResult from './components/PlanResult';
 import CodeResult from './components/CodeResult';
 import ReviewResult from './components/ReviewResult';
 import MarkdownRenderer from './components/MarkdownRenderer';
+import ConversationMessages from './components/ConversationMessages';
 import './App.css';
 
 function phaseToNode(phase: string): AgentNode {
@@ -40,6 +42,8 @@ export default function App() {
   /* ---- Conversation list ---- */
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedConvId, setSelectedConvId] = useState<string | null>(null);
+  const [convMessages, setConvMessages] = useState<ConversationMessage[]>([]);
+  const [convMessagesLoading, setConvMessagesLoading] = useState(false);
 
   const fetchConversations = useCallback(async () => {
     try {
@@ -178,10 +182,16 @@ export default function App() {
     setReviewResult(null);
     setErrorMessage(null);
     setSelectedConvId(null);
+    setConvMessages([]);
     setReviewStatus('idle');
     setReviewMessages([]);
     setReviewReport(null);
     setStreamingContent({});
+  }, []);
+
+  const handleCloseMessages = useCallback(() => {
+    setSelectedConvId(null);
+    setConvMessages([]);
   }, []);
 
   const handleFeatureSwitch = useCallback((f: FeatureType) => {
@@ -190,7 +200,7 @@ export default function App() {
   }, [genStatus]);
 
   /* ---- Conversation handlers ---- */
-  const handleSelectConversation = useCallback((convId: string) => {
+  const handleSelectConversation = useCallback(async (convId: string) => {
     if (genStatus === 'running') return;
     setSelectedConvId(convId);
     setGenStatus('idle');
@@ -202,6 +212,19 @@ export default function App() {
     setReviewResult(null);
     setErrorMessage(null);
     setStreamingContent({});
+
+    // 加载该对话的消息记录
+    setConvMessagesLoading(true);
+    try {
+      const res = await listAllMessages(convId);
+      if (res.code === 200 && res.data) {
+        setConvMessages(res.data);
+      }
+    } catch {
+      setConvMessages([]);
+    } finally {
+      setConvMessagesLoading(false);
+    }
   }, [genStatus]);
 
   const handleDeleteConversation = useCallback(async (convId: string) => {
@@ -272,26 +295,35 @@ export default function App() {
         {/* ===== 代码生成 ===== */}
         {feature === 'generate' && (
           <>
-            <div className="center-scroll">
-              <div className="center-section">
-                <RequirementInput
-                  onSubmit={handleGenSubmit}
-                  disabled={genRunning}
-                  key={selectedConvId ?? 'new'}
-                />
-              </div>
+            {/* 查看历史对话消息 */}
+            {selectedConvId && genStatus === 'idle' ? (
+              <ConversationMessages
+                messages={convMessages}
+                loading={convMessagesLoading}
+                onClose={handleCloseMessages}
+              />
+            ) : (
+              <div className="center-scroll">
+                <div className="center-section">
+                  <RequirementInput
+                    onSubmit={handleGenSubmit}
+                    disabled={genRunning}
+                    key={selectedConvId ?? 'new'}
+                  />
+                </div>
 
-              {(genStatus !== 'idle') && (
-                <>
-                  <div className="center-section">
-                    <AgentFlow steps={steps} status={genStatus} />
-                  </div>
-                  <div className="center-section">
-                    <StreamLog messages={genMessages} title="执行日志" />
-                  </div>
-                </>
-              )}
-            </div>
+                {(genStatus !== 'idle') && (
+                  <>
+                    <div className="center-section">
+                      <AgentFlow steps={steps} status={genStatus} />
+                    </div>
+                    <div className="center-section">
+                      <StreamLog messages={genMessages} title="执行日志" />
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
           </>
         )}
 

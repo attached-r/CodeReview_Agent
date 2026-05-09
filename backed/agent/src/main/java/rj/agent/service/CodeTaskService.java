@@ -1,5 +1,6 @@
 package rj.agent.service;
 
+import com.alibaba.cloud.ai.graph.exception.GraphStateException;
 import reactor.core.publisher.Flux;
 import rj.agent.model.StreamEvent;
 
@@ -18,5 +19,5 @@ public interface CodeTaskService {
      * @param userId      当前登录用户 ID（从 StpUtil 获取）
      * @return Flux 流式事件序列，前端可通过 SSE 接收
      */
-    Flux<StreamEvent> executeTask(String requirement, Long userId);
+    Flux<StreamEvent> executeTask(String requirement, Long userId) throws GraphStateException;
 }

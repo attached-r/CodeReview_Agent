@@ -1,6 +1,8 @@
 package rj.agent.controller;
 
+import cn.dev33.satoken.annotation.SaCheckLogin;
 import cn.dev33.satoken.stp.StpUtil;
+import com.alibaba.cloud.ai.graph.exception.GraphStateException;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
@@ -30,8 +32,9 @@ public class CodeTaskController {
      * 前置调用 {@link InputFilterService#validate(String)} 过滤注入，
      * 再从 Sa-Token 获取当前用户 ID，传递给服务层创建对话记录。
      */
+    @SaCheckLogin
     @PostMapping(value = "/generate", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public Flux<ServerSentEvent<Object>> generate(@RequestBody CodeTaskRequest request) {
+    public Flux<ServerSentEvent<Object>> generate(@RequestBody CodeTaskRequest request) throws GraphStateException {
         // 输入过滤（Prompt 注入/指令篡改检测）
         inputFilterService.validate(request.getRequirement());
 

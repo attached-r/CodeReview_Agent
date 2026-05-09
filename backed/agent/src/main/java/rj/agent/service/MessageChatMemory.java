@@ -10,6 +10,7 @@ import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.stereotype.Component;
+import rj.agent.config.AsyncUserContext;
 import rj.agent.entity.Conversation;
 import rj.agent.entity.ConversationMessage;
 import rj.agent.mapper.ConversationMapper;
@@ -36,6 +37,7 @@ public class MessageChatMemory implements ChatMemory {
 
     @Override
     public void add(String conversationId, List<Message> messages) {
+        checkOwnership(conversationId);
         if (messages == null || messages.isEmpty()) return;
 
         Long existingCount = messageMapper.selectCount(
@@ -98,11 +100,31 @@ public class MessageChatMemory implements ChatMemory {
     }
 
     private void checkOwnership(String conversationId) {
-        long userId = StpUtil.getLoginIdAsLong();
+        Long userId = resolveUserId();
+        if (userId == null) throw new RuntimeException("无法获取当前用户身份");
         Conversation c = conversationMapper.selectOne(
                 new LambdaQueryWrapper<Conversation>()
                         .eq(Conversation::getConversationId, conversationId));
         if (c == null) throw new RuntimeException("对话不存在");
         if (!c.getUserId().equals(userId)) throw new RuntimeException("无权访问该对话的记忆");
+    }
+
+    /**
+     * 按优先级解析当前用户 ID：
+     * <ol>
+     *   <li>异步上下文 {@link AsyncUserContext#getUserId()}</li>
+     *   <li>Sa-Token 登录上下文 {@link StpUtil#getLoginIdAsLong()}</li>
+     * </ol>
+     */
+    private Long resolveUserId() {
+        Long asyncUserId = AsyncUserContext.getUserId();
+        if (asyncUserId != null) {
+            return asyncUserId;
+        }
+        try {
+            return StpUtil.getLoginIdAsLong();
+        } catch (Exception e) {
+            return null;
+        }
     }
 }

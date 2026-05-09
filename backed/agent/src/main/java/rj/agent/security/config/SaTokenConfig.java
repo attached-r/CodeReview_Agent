@@ -18,11 +18,12 @@ public class SaTokenConfig implements WebMvcConfigurer {
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
-        // 注册 Sa-Token 路由拦截器：匹配 /api/**，放行 /api/auth/** 和健康检查
+        // 注册 Sa-Token 路由拦截器：匹配 /api/**，放行 /api/auth/**、健康检查和 SSE 流式接口
         registry.addInterceptor(new SaInterceptor(handle -> {
             SaRouter.match("/api/**")
                     .notMatch("/api/auth/**")
                     .notMatch("/api/code-task/health")
+                    .notMatch("/api/code-task/generate")
                     .check(r -> StpUtil.checkLogin());
         })).addPathPatterns("/api/**");
     }

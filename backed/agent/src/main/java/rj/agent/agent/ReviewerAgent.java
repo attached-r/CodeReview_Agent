@@ -114,6 +114,7 @@ public class ReviewerAgent {
             """;
 
     private static final String USER_PROMPT_TEMPLATE = """
+            {historyContext}
             请审查以下生成的代码：
 
             【需求描述】
@@ -137,7 +138,7 @@ public class ReviewerAgent {
         this.outputConverter = new BeanOutputConverter<>(ReviewOutput.class);
     }
 
-    public ReviewOutput execute(String requirement, CoderOutput coderOutput) {
+    public ReviewOutput execute(String requirement, CoderOutput coderOutput, String historyContext) {
         String format = outputConverter.getFormat();
 
         StringBuilder codeContent = new StringBuilder();
@@ -161,7 +162,8 @@ public class ReviewerAgent {
                 .replace("{requirement}", requirement)
                 .replace("{code}", codeContent.toString())
                 .replace("{fileList}", fileList.toString())
-                .replace("{dependencies}", dependencies);
+                .replace("{dependencies}", dependencies)
+                .replace("{historyContext}", historyContext != null ? historyContext : "");
 
         Prompt prompt = new Prompt(List.of(
                 new SystemMessage(SYSTEM_PROMPT.replace("{format}", format)),

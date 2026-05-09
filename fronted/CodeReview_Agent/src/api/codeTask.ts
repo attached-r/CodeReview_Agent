@@ -78,6 +78,8 @@ export function submitCodeTask(
             const { eventName, data } = event;
             dispatchEvent(eventName, data, callbacks);
           }
+          // yield 给 React 渲染机会，实现渐进式更新
+          await new Promise<void>(resolve => setTimeout(resolve, 0));
         }
       }
     })
